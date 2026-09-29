@@ -312,24 +312,38 @@ class MainWindow(QMainWindow):
         avatar_vbox = QVBoxLayout(self.avatar_container)
         avatar_vbox.setContentsMargins(4, 4, 4, 4)
 
+        # OpenGL Widget
+        self.gl_widget = GLAvatarWidget()
+        self.gl_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         # Title bar for 3D Viewport
         av_top = QHBoxLayout()
         av_top.setContentsMargins(8, 6, 8, 4)
-        av_title = QLabel("🧍 Mannequin 3D Virtuel (Temps Réel)")
+        av_top.setSpacing(6)
+        av_title = QLabel("🧍 Mannequin 3D Facetté (SMPL)")
         av_title.setFont(QFont("Arial", 11, QFont.Bold))
         av_title.setStyleSheet("color: #e4e4e7;")
         av_top.addWidget(av_title)
         av_top.addStretch()
 
-        btn_reset_cam = QPushButton("↺ Recentrer 3D")
-        btn_reset_cam.setStyleSheet("padding: 2px 8px; font-size: 11px;")
-        btn_reset_cam.clicked.connect(self.reset_avatar_camera)
+        btn_zoom_in = QPushButton("＋ Zoom")
+        btn_zoom_in.setToolTip("Zoomer (+ ou molette)")
+        btn_zoom_in.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+        btn_zoom_in.clicked.connect(lambda: self.gl_widget.zoom_in())
+        av_top.addWidget(btn_zoom_in)
+
+        btn_zoom_out = QPushButton("－ Dézoom")
+        btn_zoom_out.setToolTip("Dézoomer (- ou molette)")
+        btn_zoom_out.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+        btn_zoom_out.clicked.connect(lambda: self.gl_widget.zoom_out())
+        av_top.addWidget(btn_zoom_out)
+
+        btn_reset_cam = QPushButton("↺ Recentrer")
+        btn_reset_cam.setToolTip("Recentrer la caméra 3D (0 ou double-clic)")
+        btn_reset_cam.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+        btn_reset_cam.clicked.connect(lambda: self.gl_widget.reset_camera())
         av_top.addWidget(btn_reset_cam)
         avatar_vbox.addLayout(av_top)
-
-        # OpenGL Widget
-        self.gl_widget = GLAvatarWidget()
-        self.gl_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         avatar_vbox.addWidget(self.gl_widget)
 
         self.splitter.addWidget(self.video_container)
@@ -392,20 +406,25 @@ class MainWindow(QMainWindow):
         controls_row.addSpacing(12)
 
         # 3D Toggles
-        self.chk_mesh = QCheckBox("🕸️ Maillage 3D")
+        self.chk_mesh = QCheckBox("🕸️ Maillage Vidéo")
         self.chk_mesh.setChecked(True)
         self.chk_mesh.stateChanged.connect(lambda s: setattr(self, 'show_mesh', s == Qt.Checked.value))
         controls_row.addWidget(self.chk_mesh)
 
-        self.chk_skel = QCheckBox("🦴 Squelette")
-        self.chk_skel.setChecked(True)
-        self.chk_skel.stateChanged.connect(lambda s: setattr(self, 'show_skeleton', s == Qt.Checked.value))
-        controls_row.addWidget(self.chk_skel)
+        self.chk_wireframe = QCheckBox("📐 Arêtes Facettées")
+        self.chk_wireframe.setChecked(True)
+        self.chk_wireframe.stateChanged.connect(lambda s: self.gl_widget.set_show_wireframe(s == Qt.Checked.value))
+        controls_row.addWidget(self.chk_wireframe)
 
-        self.chk_mannequin = QCheckBox("🧍 Mannequin")
-        self.chk_mannequin.setChecked(True)
-        self.chk_mannequin.stateChanged.connect(self.on_toggle_mannequin)
-        controls_row.addWidget(self.chk_mannequin)
+        self.chk_smooth = QCheckBox("✨ Surface Lisse")
+        self.chk_smooth.setChecked(False)
+        self.chk_smooth.stateChanged.connect(lambda s: self.gl_widget.set_shading_mode(not (s == Qt.Checked.value)))
+        controls_row.addWidget(self.chk_smooth)
+
+        self.chk_skel = QCheckBox("🦴 Squelette")
+        self.chk_skel.setChecked(False)
+        self.chk_skel.stateChanged.connect(lambda s: setattr(self.gl_widget, 'show_skeleton', s == Qt.Checked.value) or self.gl_widget.update())
+        controls_row.addWidget(self.chk_skel)
 
         self.chk_grid = QCheckBox("🌐 Grille 3D")
         self.chk_grid.setChecked(True)
@@ -501,11 +520,7 @@ class MainWindow(QMainWindow):
         self.gl_widget.update()
 
     def reset_avatar_camera(self):
-        self.gl_widget.camera_yaw = 20.0
-        self.gl_widget.camera_pitch = 10.0
-        self.gl_widget.camera_dist = 2.4
-        self.gl_widget.camera_target = np.array([0.0, 0.1, 0.0], dtype=np.float32)
-        self.gl_widget.update()
+        self.gl_widget.reset_camera()
 
     def toggle_view_mode(self):
         self.is_pip_mode = not self.is_pip_mode
@@ -527,7 +542,20 @@ class MainWindow(QMainWindow):
             self.rec_timer.stop()
             self.btn_rec.setText("⏺ REC 0:00")
             self.btn_rec.setStyleSheet("background-color: #3f1218; border: 1px solid #7f1d1d; color: #fca5a5; font-weight: bold;")
-            QMessageBox.showinfo("Enregistrement 3D", "Séquence de mouvement 3D enregistrée avec succès !")
+            QMessageBox.information(self, "Enregistrement 3D", "Séquence de mouvement 3D enregistrée avec succès !")
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key in (Qt.Key_Plus, Qt.Key_Equal):
+            self.gl_widget.zoom_in()
+        elif key in (Qt.Key_Minus, Qt.Key_Underscore):
+            self.gl_widget.zoom_out()
+        elif key in (Qt.Key_0, Qt.Key_R):
+            self.gl_widget.reset_camera()
+        elif key == Qt.Key_Space:
+            self.toggle_play()
+        else:
+            super().keyPressEvent(event)
 
     def _update_rec_timer(self):
         elapsed = int(time.time() - self.record_start_time)
