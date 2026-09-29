@@ -15,10 +15,27 @@ import os
 import signal
 import argparse
 
-# Ensure local modules are found
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-if CURRENT_DIR not in sys.path:
-    sys.path.insert(0, CURRENT_DIR)
+# Fix for Qt plugin loader when workspace path contains special characters or colons
+qt_share_plugins = os.path.expanduser("~/.local/share/vision3d/plugins")
+qt_share_platforms = os.path.join(qt_share_plugins, "platforms")
+if not os.path.exists(os.path.join(qt_share_platforms, "libqcocoa.dylib")):
+    try:
+        import PySide6
+        src_plugins = os.path.join(os.path.dirname(PySide6.__file__), "Qt", "plugins")
+        if os.path.exists(src_plugins):
+            import shutil
+            os.makedirs(qt_share_plugins, exist_ok=True)
+            shutil.copytree(src_plugins, qt_share_plugins, dirs_exist_ok=True)
+    except Exception:
+        pass
+
+if os.path.exists(qt_share_plugins):
+    os.environ["QT_PLUGIN_PATH"] = qt_share_plugins
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_share_platforms
+
+from PySide6.QtCore import QCoreApplication
+if os.path.exists(qt_share_plugins):
+    QCoreApplication.addLibraryPath(qt_share_plugins)
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
