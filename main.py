@@ -96,8 +96,13 @@ def main():
     window = MainWindow(initial_source=initial_source, is_webcam=args.webcam)
     window.show()
 
-    # Enter Qt Event Loop
-    sys.exit(app.exec())
+    # Enter Qt Event Loop with clean worker thread shutdown
+    try:
+        sys.exit(app.exec())
+    finally:
+        if 'window' in locals() and hasattr(window, 'worker') and window.worker.isRunning():
+            window.worker.stop()
+            window.worker.wait(1000)
 
 
 if __name__ == "__main__":

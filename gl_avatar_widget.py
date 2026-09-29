@@ -68,6 +68,9 @@ class GLAvatarWidget(QOpenGLWidget):
         self.show_grid = True
         self.faceted_mode = True    # True = Faceted polygon surface; False = Smooth skin
         self.show_wireframe = True  # Overlay polygonal mesh lines
+        # Current 3D landmarks in meters: shape (33, 3)
+        self.pts_world = None
+        self.vis = None
 
         # Spatial Grounding & Floor Reference
         self.foot_grounding = True
