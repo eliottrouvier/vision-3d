@@ -1,6 +1,7 @@
 # vision-3d
 
-Reconstruction 3D du corps humain (Human Mesh Recovery) et avatar articulé en temps réel (OpenGL) à partir d'une vidéo ou de la webcam.
+> **Tech Stack : Python • MediaPipe • PyOpenGL • 1€ Filter • PySide6 • OpenCV**  
+> Real-time 3D human body reconstruction (Human Mesh Recovery) and articulated avatar visualization from video or webcam.
 
 ## Lancement
 
