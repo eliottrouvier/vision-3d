@@ -17,7 +17,7 @@ vision3d chemin/vers/video.mp4
 
 ## Architecture
 
-- **`tracker_3d.py`** : Inférence MediaPipe Pose Landmarker (coordonnées métriques $X, Y, Z$ en temps réel, ~18 ms sur Apple M4) et génération du maillage volumétrique filaire.
+- **`tracker_3d.py` / `one_euro_filter.py`** : Inférence MediaPipe Pose Landmarker + filtre adaptatif 1€ (suppression des micro-tremblements, ancrage au sol) et maillage filaire.
 - **`gl_avatar_widget.py`** : Viewport PyOpenGL avec maillage continu facetté (SMPL-lite), alternance surface lisse / arêtes polygonales et éclairage studio.
 - **Contrôles caméra 360° & Zoom** (dans `gl_avatar_widget.py`) : Orbite 3D (clic-glisser), zoom multi-modal (boutons tactiles `+`/`-`, pincement trackpad Mac, touches clavier `+`/`-` et molette), double-clic reset (`0`).
 - **`main_window.py`** : Interface PySide6 avec vue scindée réglable, bascule Picture-in-Picture (PiP), scrubber temporel et contrôle de vitesse (0.5x à 2.0x).

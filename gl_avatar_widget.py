@@ -69,12 +69,24 @@ class GLAvatarWidget(QOpenGLWidget):
         self.faceted_mode = True    # True = Faceted polygon surface; False = Smooth skin
         self.show_wireframe = True  # Overlay polygonal mesh lines
 
-        # Current 3D landmarks in meters: shape (33, 3)
-        self.pts_world = None
-        self.vis = None
+        # Spatial Grounding & Floor Reference
+        self.foot_grounding = True
+        self.smooth_ground_y = None
+        self.smooth_center_x = 0.0
+        self.smooth_center_z = 0.0
 
         # Floating HUD Zoom Toolbar (tactile buttons top-right)
         self._build_floating_toolbar()
+
+    def reset_filter(self):
+        self.smooth_ground_y = None
+        self.smooth_center_x = 0.0
+        self.smooth_center_z = 0.0
+
+    def set_foot_grounding(self, enabled: bool):
+        self.foot_grounding = enabled
+        self.reset_filter()
+        self.update()
 
     def _build_floating_toolbar(self):
         """Creates semi-transparent floating zoom controls overlay in the top-right corner."""
@@ -355,14 +367,43 @@ class GLAvatarWidget(QOpenGLWidget):
     # SMPL-LITE CONTINUOUS FACETED 3D MESH GENERATION & RENDERING
     # ==============================================================
     def _render_smpl_avatar(self, raw_pts):
-        """Builds and renders the continuous multi-ring anatomical SMPL mesh."""
+        """Builds and renders the continuous multi-ring anatomical SMPL mesh with spatial grounding."""
         pts = raw_pts.copy()
         pts[:, 1] = -pts[:, 1]  # Y up in OpenGL
         pts[:, 2] = -pts[:, 2]  # Z depth alignment
 
-        # Center hips at (0, 0, 0)
-        hip_center = (pts[23] + pts[24]) * 0.5
-        pts = pts - hip_center
+        # Smooth horizontal centering (X, Z) so the avatar stays in frame without lateral jerking
+        raw_cx = float((pts[23, 0] + pts[24, 0]) * 0.5)
+        raw_cz = float((pts[23, 2] + pts[24, 2]) * 0.5)
+        if abs(self.smooth_center_x) < 1e-4 and abs(self.smooth_center_z) < 1e-4:
+            self.smooth_center_x = raw_cx
+            self.smooth_center_z = raw_cz
+        else:
+            self.smooth_center_x = 0.85 * self.smooth_center_x + 0.15 * raw_cx
+            self.smooth_center_z = 0.85 * self.smooth_center_z + 0.15 * raw_cz
+
+        pts[:, 0] -= self.smooth_center_x
+        pts[:, 2] -= self.smooth_center_z
+
+        if self.foot_grounding:
+            # Intelligent Foot Grounding:
+            # Anchor lowest supporting foot contact point on the ground grid (Y = -0.92)
+            foot_indices = [27, 28, 29, 30, 31, 32]
+            lowest_foot_y = float(np.min(pts[foot_indices, 1]))
+            ground_plane_y = -0.92
+
+            target_offset_y = ground_plane_y - lowest_foot_y
+            if self.smooth_ground_y is None:
+                self.smooth_ground_y = target_offset_y
+            else:
+                # Smooth low-pass filtering on ground contact so feet don't jitter
+                self.smooth_ground_y = 0.85 * self.smooth_ground_y + 0.15 * target_offset_y
+
+            pts[:, 1] += self.smooth_ground_y
+        else:
+            # Standard Hip Centering
+            hip_y = (pts[23, 1] + pts[24, 1]) * 0.5
+            pts[:, 1] -= hip_y
 
         triangles = []  # List of ((v0, v1, v2), normal)
         edges = []      # List of (p1, p2) for wireframe

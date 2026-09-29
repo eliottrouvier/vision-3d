@@ -15,6 +15,7 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
+from one_euro_filter import OneEuroFilter3D
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 TASK_MODEL_PATH = os.path.join(PROJECT_DIR, "pose_landmarker_full.task")
@@ -91,11 +92,21 @@ class Tracker3D:
         self.prev_w = None
         self.prev_h = None
 
+        # 1€ Filter for temporal jitter removal
+        self.filter_world = OneEuroFilter3D(min_cutoff=0.9, beta=0.012, d_cutoff=1.0)
+        self.filter_2d = OneEuroFilter3D(min_cutoff=1.2, beta=0.015, d_cutoff=1.0)
+        self.filter_enabled = True
+
+    def reset_filter(self):
+        self.filter_world.reset()
+        self.filter_2d.reset()
+
     def reset_detector(self):
         try:
             self.detector.close()
         except Exception:
             pass
+        self.reset_filter()
         base_options = mp_python.BaseOptions(model_asset_path=TASK_MODEL_PATH)
         options = vision.PoseLandmarkerOptions(
             base_options=base_options,
@@ -150,6 +161,11 @@ class Tracker3D:
             # Fallback approximate world coordinates
             pts_world = pts_2d.copy()
             pts_world[:, :2] = (pts_world[:, :2] - [w/2, h/2]) / (h/2)
+
+        # Apply adaptive 1€ Filter for rock-solid stability
+        if self.filter_enabled:
+            pts_world = self.filter_world.filter(pts_world)
+            pts_2d = self.filter_2d.filter(pts_2d)
 
         # Bounding box around visible landmarks
         valid = vis > 0.3

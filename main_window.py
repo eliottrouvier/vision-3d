@@ -431,6 +431,18 @@ class MainWindow(QMainWindow):
         self.chk_grid.stateChanged.connect(lambda s: setattr(self.gl_widget, 'show_grid', s == Qt.Checked.value) or self.gl_widget.update())
         controls_row.addWidget(self.chk_grid)
 
+        self.chk_filter = QCheckBox("🛡️ Stabilisation 1€")
+        self.chk_filter.setChecked(True)
+        self.chk_filter.setToolTip("Filtre adaptatif 1€ éliminant les micro-tremblements")
+        self.chk_filter.stateChanged.connect(lambda s: setattr(self.worker.tracker, 'filter_enabled', s == Qt.Checked.value))
+        controls_row.addWidget(self.chk_filter)
+
+        self.chk_ground = QCheckBox("⚓ Ancrage Sol")
+        self.chk_ground.setChecked(True)
+        self.chk_ground.setToolTip("Maintient les pieds au sol (en squat, le bassin descend réellement)")
+        self.chk_ground.stateChanged.connect(lambda s: self.gl_widget.set_foot_grounding(s == Qt.Checked.value))
+        controls_row.addWidget(self.chk_ground)
+
         controls_row.addStretch()
 
         # Speed selector
@@ -502,11 +514,15 @@ class MainWindow(QMainWindow):
         self.btn_play.setText("⏸ Pause" if self.worker.playing else "▶ Lecture")
 
     def rewind_video(self):
+        self.worker.tracker.reset_filter()
+        self.gl_widget.reset_filter()
         self.worker.seek(0)
         self.slider.setValue(0)
         self._render_initial_frame()
 
     def on_seek(self, val):
+        self.worker.tracker.reset_filter()
+        self.gl_widget.reset_filter()
         self.worker.seek(val)
         if not self.worker.playing:
             self._render_initial_frame()
@@ -570,6 +586,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Capture Sauvegardée", f"Image HD enregistrée sous :\n{filename}")
 
     def on_source_selected(self, idx):
+        self.worker.tracker.reset_filter()
+        self.gl_widget.reset_filter()
         text = self.combo_source.currentText()
         if "Webcam" in text:
             self.worker.open_source(is_webcam=True)
